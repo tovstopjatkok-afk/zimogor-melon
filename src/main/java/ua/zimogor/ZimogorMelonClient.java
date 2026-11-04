@@ -13,6 +13,6 @@ import net.minecraft.client.render.BlockRenderLayer;
 public class ZimogorMelonClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        BlockRenderLayerMap.INSTANCE.putBlock(Blocks.MELON, BlockRenderLayer.CUTOUT);
+        BlockRenderLayerMap.putBlock(Blocks.MELON, BlockRenderLayer.CUTOUT);
     }
 }
