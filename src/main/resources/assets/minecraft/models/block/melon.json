@@ -1,6 +1,33 @@
 {
-  "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "minecraft:block/spawner"
-  }
+    "particle": "minecraft:block/spawner",
+    "cage": "minecraft:block/spawner",
+    "stray": "minecraft:entity/skeleton/stray"
+  },
+  "elements": [
+    {
+      "from": [4, 2, 4],
+      "to": [12, 10, 12],
+      "faces": {
+        "north": {"uv": [2, 4, 4, 8], "texture": "#stray"},
+        "south": {"uv": [2, 4, 4, 8], "texture": "#stray"},
+        "east": {"uv": [2, 4, 4, 8], "texture": "#stray"},
+        "west": {"uv": [2, 4, 4, 8], "texture": "#stray"},
+        "up": {"uv": [2, 0, 4, 4], "texture": "#stray"},
+        "down": {"uv": [4, 0, 6, 4], "texture": "#stray"}
+      }
+    },
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "north": {"uv": [0, 0, 16, 16], "texture": "#cage"},
+        "south": {"uv": [0, 0, 16, 16], "texture": "#cage"},
+        "east": {"uv": [0, 0, 16, 16], "texture": "#cage"},
+        "west": {"uv": [0, 0, 16, 16], "texture": "#cage"},
+        "up": {"uv": [0, 0, 16, 16], "texture": "#cage"},
+        "down": {"uv": [0, 0, 16, 16], "texture": "#cage"}
+      }
+    }
+  ]
 }
