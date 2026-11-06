@@ -1,4 +1,4 @@
-# Zimogor Melon (Fabric 1.21.11)
+# Zimogor Melon (Fabric 1.21.8)
 
 Арбуз выглядит как спавнер: берётся оригинальная текстура спавнера из игры
 и включается прозрачность клетки. Поведение арбуза не меняется.
@@ -12,7 +12,7 @@
 1. Установи **JDK 21** (например, Temurin: https://adoptium.net). Проверка: `java -version` должен показать 21.
 2. Распакуй этот архив в папку без русских букв и пробелов, например `C:\mods\zimogor-melon`.
 3. В архиве нет файлов `gradlew`, поэтому возьми их из официального шаблона Fabric:
-   - зайди на https://fabricmc.net/develop, выбери Minecraft 1.21.11 и нажми Download Template;
+   - зайди на https://fabricmc.net/develop, выбери Minecraft 1.21.8 и нажми Download Template;
    - распакуй шаблон куда угодно и скопируй из него **папку `gradle` и файлы `gradlew` и `gradlew.bat`**
      в папку `zimogor-melon` (рядом с `build.gradle`).
      Больше ничего из шаблона копировать не надо.
@@ -25,12 +25,12 @@
    (на Linux/macOS: `./gradlew build`). Первый раз скачивается много, это нормально, подожди несколько минут.
 6. Готовый мод лежит тут: `build\libs\zimogor-melon-1.3.0.jar`.
    Файл с `-sources` в конце не нужен.
-7. Положи jar в папку `.minecraft\mods` вместе с **Fabric API** для 1.21.11.
+7. Положи jar в папку `.minecraft\mods` вместе с **Fabric API** для 1.21.8.
 
 ## Если сборка не идёт
 
 - **Не находятся версии (Could not find / resolve)**: зайди на https://fabricmc.net/develop,
-  выбери Minecraft 1.21.11 и скопируй актуальные `yarn_mappings`, `loader_version`
+  выбери Minecraft 1.21.8 и скопируй актуальные `yarn_mappings`, `loader_version`
   и `fabric_version` в `gradle.properties`.
 - **Ошибка в `ZimogorMelonClient.java` про `BlockRenderLayerMap` или `BlockRenderLayer`**:
   в разных версиях Fabric API это имя или способ вызова могли поменяться.
