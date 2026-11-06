@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "zimogor_melon",
+  "version": "${version}",
+  "name": "Zimogor Melon",
+  "description": "Watermelon block looks like a monster spawner (vanilla spawner texture, transparent cage).",
+  "authors": [],
+  "license": "CC0-1.0",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "ua.zimogor.ZimogorMelonClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.11",
+    "fabric-api": "*"
+  }
+}
