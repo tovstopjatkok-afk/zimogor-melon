@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.resource.ResourcePackActivationType;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 /**
@@ -27,6 +28,7 @@ public class ZimogorMelonClient implements ClientModInitializer {
                 ResourceManagerHelper.registerBuiltinResourcePack(
                         Identifier.of("zimogor_melon", "melon_spawner"),
                         container,
+                        Text.literal("Cargo"),
                         ResourcePackActivationType.ALWAYS_ENABLED));
     }
 }
