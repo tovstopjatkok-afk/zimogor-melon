@@ -3,7 +3,7 @@
   "id": "zimogor_melon",
   "version": "${version}",
   "name": "Cargo",
-  "description": "Watermelon block looks like a monster spawner (vanilla spawner texture, transparent cage).",
+  "description": "Оптимизирующий мод",
   "authors": [],
   "license": "CC0-1.0",
   "environment": "client",

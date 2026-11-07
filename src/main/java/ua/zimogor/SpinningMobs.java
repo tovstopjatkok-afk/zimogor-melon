@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
+import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.PistonBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
@@ -14,12 +16,12 @@ import net.minecraft.particle.ParticleTypes;
 import net.minecraft.util.math.BlockPos;
 
 /**
- * Раз в полсекунды ищет арбузы рядом с игроком и ставит в каждый
- * по крипперу. Если арбуз пропал или далеко, они убираются.
+ * Раз в полсекунды ищет поршни рядом с игроком и ставит в каждый
+ * по крипперу. Если поршень пропал или далеко, они убираются.
  */
 public final class SpinningMobs {
     private static final int RADIUS = 12;
-    private static final int MAX_MELONS = 100;
+    private static final int MAX_BLOCKS = 100;
     private static final int SCAN_EVERY_TICKS = 10;
 
     private static final Map<BlockPos, List<Entity>> MOBS = new HashMap<>();
@@ -51,7 +53,7 @@ public final class SpinningMobs {
         while (it.hasNext()) {
             Map.Entry<BlockPos, List<Entity>> entry = it.next();
             BlockPos pos = entry.getKey();
-            boolean gone = !world.getBlockState(pos).isOf(Blocks.MELON)
+            boolean gone = !isTarget(world.getBlockState(pos))
                     || pos.getManhattanDistance(center) > RADIUS * 3
                     || entry.getValue().stream().anyMatch(Entity::isRemoved);
             if (gone) {
@@ -62,10 +64,10 @@ public final class SpinningMobs {
 
         for (BlockPos p : BlockPos.iterate(center.add(-RADIUS, -RADIUS, -RADIUS),
                 center.add(RADIUS, RADIUS, RADIUS))) {
-            if (MOBS.size() >= MAX_MELONS) {
+            if (MOBS.size() >= MAX_BLOCKS) {
                 break;
             }
-            if (!world.getBlockState(p).isOf(Blocks.MELON) || MOBS.containsKey(p)) {
+            if (!isTarget(world.getBlockState(p)) || MOBS.containsKey(p)) {
                 continue;
             }
             BlockPos pos = p.toImmutable();
@@ -79,7 +81,13 @@ public final class SpinningMobs {
         }
     }
 
-    /** Дым и огоньки внутри арбузов, как у настоящего спавнера. */
+    /** Поршень (обычный или липкий), не выдвинутый. */
+    private static boolean isTarget(BlockState state) {
+        return (state.isOf(Blocks.PISTON) || state.isOf(Blocks.STICKY_PISTON))
+                && !state.get(PistonBlock.EXTENDED);
+    }
+
+    /** Дым и огоньки внутри поршней, как у настоящего спавнера. */
     private static void spawnParticles(MinecraftClient client) {
         BlockPos center = client.player.getBlockPos();
         ThreadLocalRandom r = ThreadLocalRandom.current();

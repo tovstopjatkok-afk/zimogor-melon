@@ -12,18 +12,19 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 /**
- * Арбуз использует текстуру спавнера (см. models/block/melon.json).
+ * Поршни используют текстуру спавнера (см. blockstates/piston.json).
  * У текстуры спавнера прозрачные дырки в клетке, поэтому блок нужно
  * рисовать в слое CUTOUT, иначе вместо прозрачности будет чёрный фон.
- * Внутри каждого арбуза крутится крипер (см. SpinningMobs).
+ * Внутри каждого поршня крутится крипер (см. SpinningMobs).
  */
 public class ZimogorMelonClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        BlockRenderLayerMap.putBlock(Blocks.MELON, BlockRenderLayer.CUTOUT);
+        BlockRenderLayerMap.putBlock(Blocks.PISTON, BlockRenderLayer.CUTOUT);
+        BlockRenderLayerMap.putBlock(Blocks.STICKY_PISTON, BlockRenderLayer.CUTOUT);
         ClientTickEvents.END_CLIENT_TICK.register(SpinningMobs::tick);
 
-        // Отдельный встроенный ресурспак, всегда включён: перебивает ванильную модель арбуза.
+        // Отдельный встроенный ресурспак, всегда включён: перебивает ванильные модели поршней.
         FabricLoader.getInstance().getModContainer("zimogor_melon").ifPresent(container ->
                 ResourceManagerHelper.registerBuiltinResourcePack(
                         Identifier.of("zimogor_melon", "melon_spawner"),

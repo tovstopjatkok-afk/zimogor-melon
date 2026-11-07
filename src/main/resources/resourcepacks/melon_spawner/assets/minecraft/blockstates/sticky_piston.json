@@ -1,0 +1,5 @@
+{
+  "multipart": [
+    { "apply": { "model": "zimogor_melon:block/spawner_cube" } }
+  ]
+}
