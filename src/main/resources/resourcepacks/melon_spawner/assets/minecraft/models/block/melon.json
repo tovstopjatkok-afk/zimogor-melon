@@ -1,6 +1,7 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube_column",
   "textures": {
-    "all": "minecraft:block/spawner"
+    "end": "minecraft:block/melon_top",
+    "side": "minecraft:block/melon_side"
   }
 }
