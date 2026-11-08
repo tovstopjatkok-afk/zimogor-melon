@@ -3,7 +3,8 @@
   "package": "ua.zimogor.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "AbstractBlockStateMixin"
+    "AbstractBlockStateMixin",
+    "ClientPlayerInteractionManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
