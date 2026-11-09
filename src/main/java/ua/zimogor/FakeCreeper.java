@@ -34,7 +34,9 @@ public class FakeCreeper extends CreeperEntity {
     private int fuse;
     private int stepTicks;
     private int deadTicks;
-    private int hits;
+    private double hits;
+    private int lastHit = -100;
+    private int lastDamagerHit = -100;
     private double peakY = Double.NaN;
 
     public FakeCreeper(World world, boolean phantom) {
@@ -221,18 +223,40 @@ public class FakeCreeper extends CreeperEntity {
         return best;
     }
 
-    /** Удар игрока: считаются удары (2 удара убивают), только у нас на клиенте. */
+    /**
+     * Удар игрока, как у настоящего: сила зависит от перезарядки (быстрые клики по 20-100% удара),
+     * после удара 10 тиков неуязвимость. Полный удар считается за 1, два полных убивают.
+     */
     public void clientHit(PlayerEntity player) {
         if (this.isDead()) {
             return;
         }
+        float cooldown = player.getAttackCooldownProgress(0.5f);
         player.resetLastAttackedTicks();
-        hits++;
-        if (hits >= HITS_TO_KILL) {
+        if (this.age - lastHit < 10) {
+            return;
+        }
+        lastHit = this.age;
+        applyHit(player.getX(), player.getZ(), 0.2 + cooldown * cooldown * 0.8);
+    }
+
+    /** Удар дамагера: как игрок с мечом, полный удар не чаще раза в 13 тиков (перезарядка меча). */
+    public void damagerHit(double fromX, double fromZ) {
+        if (this.isDead() || this.age - lastDamagerHit < 13 || this.age - lastHit < 10) {
+            return;
+        }
+        lastDamagerHit = this.age;
+        lastHit = this.age;
+        applyHit(fromX, fromZ, 1.0);
+    }
+
+    private void applyHit(double fromX, double fromZ, double strength) {
+        hits += strength;
+        if (hits >= HITS_TO_KILL - 1.0e-6) {
             this.setHealth(0.0f);
         }
-        double dx = this.getX() - player.getX();
-        double dz = this.getZ() - player.getZ();
+        double dx = this.getX() - fromX;
+        double dz = this.getZ() - fromZ;
         double d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         this.setVelocity(dx / d * 0.4, 0.3, dz / d * 0.4);
         this.handleStatus(this.isDead() ? (byte) 3 : (byte) 2);

@@ -164,13 +164,15 @@ public final class SpinningMobs {
         return true;
     }
 
-    /** Любой фантомный крипер в зоне 1.5 x 1.5 x 1.5 вокруг дамагера умирает. */
+    /** Дамагер бьёт как игрок с мечом: каждого фантомного крипера в радиусе 2 блоков, 2 удара убивают. */
     private static void killByDamagers() {
         for (BlockPos pos : DAMAGERS) {
-            Box zone = new Box(pos).expand(0.25);
+            double cx = pos.getX() + 0.5;
+            double cy = pos.getY() + 0.5;
+            double cz = pos.getZ() + 0.5;
             for (FakeCreeper c : PHANTOMS) {
-                if (!c.isDead() && c.getBoundingBox().intersects(zone)) {
-                    c.clientKill();
+                if (!c.isDead() && c.squaredDistanceTo(cx, cy, cz) <= 4.0) {
+                    c.damagerHit(cx, cz);
                 }
             }
         }
