@@ -1,5 +1,6 @@
 package ua.zimogor;
 
+import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.MovementType;
@@ -8,6 +9,8 @@ import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.mob.CreeperEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -26,6 +29,7 @@ public class FakeCreeper extends CreeperEntity {
     private int fuse;
     private int deadTicks;
     private int hits;
+    private int stepTicks;
     private static final int HITS_TO_KILL = 2; // умирает с двух ударов
 
     public FakeCreeper(World world, boolean phantom) {
@@ -94,6 +98,14 @@ public class FakeCreeper extends CreeperEntity {
         vy -= 0.08;
         vy *= 0.98;
         this.move(MovementType.SELF, new Vec3d(mx, vy, mz));
+        if (this.isOnGround() && (mx != 0.0 || mz != 0.0) && ++stepTicks >= 8) {
+            stepTicks = 0;
+            if (MinecraftClient.getInstance().world != null) {
+                BlockState below = MinecraftClient.getInstance().world.getBlockState(
+                        BlockPos.ofFloored(this.getX(), this.getY() - 0.2, this.getZ()));
+                Sfx.play(below.getSoundGroup().getStepSound(), this.getX(), this.getY(), this.getZ(), 0.15f, 1.0f);
+            }
+        }
         if (this.isOnGround()) {
             vy = 0.0;
             if (this.horizontalCollision && dist > 1.5) {
@@ -104,7 +116,11 @@ public class FakeCreeper extends CreeperEntity {
         boolean near = dist < 2.5 && Math.abs(player.getY() - this.getY()) < 2.0;
         this.setFuseSpeed(near ? 1 : -1);
         if (near) {
+            if (fuse == 0) {
+                Sfx.play(SoundEvents.ENTITY_CREEPER_PRIMED, this.getX(), this.getY(), this.getZ(), 1.0f, 0.5f);
+            }
             if (++fuse >= 30) {
+                Sfx.play(SoundEvents.ENTITY_GENERIC_EXPLODE, this.getX(), this.getY(), this.getZ(), 4.0f, 1.0f);
                 MinecraftClient.getInstance().particleManager.addParticle(ParticleTypes.EXPLOSION_EMITTER,
                         this.getX(), this.getY() + 0.5, this.getZ(), 2.0, 0.0, 0.0);
                 this.discard();
@@ -131,6 +147,8 @@ public class FakeCreeper extends CreeperEntity {
         kbZ = dz / d * 0.4;
         vy = 0.3;
         this.handleStatus(this.isDead() ? (byte) 3 : (byte) 2);
+        Sfx.play(this.isDead() ? SoundEvents.ENTITY_CREEPER_DEATH : SoundEvents.ENTITY_CREEPER_HURT,
+                this.getX(), this.getY(), this.getZ(), 1.0f, 1.0f);
     }
 
     /** Убить мгновенно (дамагер): только у нас на клиенте. */
@@ -140,6 +158,7 @@ public class FakeCreeper extends CreeperEntity {
         }
         this.setHealth(0.0f);
         this.handleStatus((byte) 3);
+        Sfx.play(SoundEvents.ENTITY_CREEPER_DEATH, this.getX(), this.getY(), this.getZ(), 1.0f, 1.0f);
     }
 
     // Заряженный крипер (с электрическим свечением), как после удара молнии.

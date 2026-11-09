@@ -31,7 +31,7 @@ public final class SpinningMobs {
 
     private static final Map<BlockPos, List<Entity>> MOBS = new HashMap<>();
     private static final List<FakeCreeper> PHANTOMS = new ArrayList<>();
-    private static final Map<BlockPos, Long> NEXT_SPAWN = new HashMap<>();
+    private static final Map<BlockPos, Integer> SPAWN_DELAY = new HashMap<>();
     private static final Set<BlockPos> DAMAGERS = new HashSet<>();
     private static ClientWorld lastWorld;
     private static int nextId = 0x7FFF0000;
@@ -92,10 +92,13 @@ public final class SpinningMobs {
         tickPhantoms(client, world, center);
     }
 
-    /** Раз в 200-800 тиков каждый поршень рядом с игроком создаёт фантомного крипера, не больше 6 поблизости. */
+    /**
+     * Как у настоящего спавнера: таймер 200-800 тиков (идёт, только если игрок ближе 16 блоков),
+     * за цикл до 4 попыток появления в области +-4 по горизонтали и +-1 по вертикали,
+     * не больше 6 криперов в области.
+     */
     private static void tickPhantoms(MinecraftClient client, ClientWorld world, BlockPos center) {
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        long now = world.getTime();
 
         PHANTOMS.removeIf(c -> {
             boolean drop = c.isRemoved() || c.squaredDistanceTo(client.player) > 48.0 * 48.0;
@@ -104,25 +107,26 @@ public final class SpinningMobs {
             }
             return drop;
         });
-        NEXT_SPAWN.keySet().retainAll(MOBS.keySet());
+        SPAWN_DELAY.keySet().retainAll(MOBS.keySet());
 
         for (BlockPos pos : MOBS.keySet()) {
             if (pos.getSquaredDistance(center) > 256) {
                 continue;
             }
-            long next = NEXT_SPAWN.computeIfAbsent(pos, k -> now + 20 + r.nextInt(80));
-            if (now < next) {
+            int delay = SPAWN_DELAY.getOrDefault(pos, 20) - SCAN_EVERY_TICKS;
+            if (delay > 0) {
+                SPAWN_DELAY.put(pos, delay);
                 continue;
             }
-            NEXT_SPAWN.put(pos, now + 200 + r.nextInt(600));
+            SPAWN_DELAY.put(pos, 200 + r.nextInt(600));
 
-            double cx = pos.getX() + 0.5;
-            double cy = pos.getY() + 0.5;
-            double cz = pos.getZ() + 0.5;
-            long nearby = PHANTOMS.stream().filter(c -> c.squaredDistanceTo(cx, cy, cz) < 64.0).count();
+            Box area = new Box(pos).expand(4.0);
+            long nearby = PHANTOMS.stream().filter(c -> c.getBoundingBox().intersects(area)).count();
             if (nearby >= MAX_NEARBY) {
                 continue;
             }
+
+            boolean spawned = false;
             for (int i = 0; i < 4; i++) {
                 double x = pos.getX() + (r.nextDouble() - r.nextDouble()) * 4.0 + 0.5;
                 int by = pos.getY() + r.nextInt(3) - 1;
@@ -133,8 +137,18 @@ public final class SpinningMobs {
                     creeper.setId(nextId++);
                     creeper.setPosition(x, by, z);
                     world.addEntity(creeper);
+                    creeper.handleStatus((byte) 20); // облачко появления, как у спавнера
                     PHANTOMS.add(creeper);
-                    break;
+                    spawned = true;
+                }
+            }
+            if (spawned) {
+                for (int i = 0; i < 20; i++) {
+                    double px = pos.getX() + 0.5 + (r.nextDouble() - 0.5) * 2.0;
+                    double py = pos.getY() + 0.5 + (r.nextDouble() - 0.5) * 2.0;
+                    double pz = pos.getZ() + 0.5 + (r.nextDouble() - 0.5) * 2.0;
+                    client.particleManager.addParticle(ParticleTypes.SMOKE, px, py, pz, 0.0, 0.0, 0.0);
+                    client.particleManager.addParticle(ParticleTypes.FLAME, px, py, pz, 0.0, 0.0, 0.0);
                 }
             }
         }
@@ -192,7 +206,7 @@ public final class SpinningMobs {
         MOBS.clear();
         PHANTOMS.forEach(Entity::discard);
         PHANTOMS.clear();
-        NEXT_SPAWN.clear();
+        SPAWN_DELAY.clear();
         DAMAGERS.clear();
     }
 }
