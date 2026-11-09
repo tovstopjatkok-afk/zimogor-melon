@@ -33,6 +33,9 @@ public class FakeCreeper extends CreeperEntity {
     private boolean igniting;
     private int fuse;
     private int stepTicks;
+    private int stuckTicks;
+    private int strafeTicks;
+    private double strafeSign = 1.0;
     private int deadTicks;
     private double hits;
     private int lastHit = -100;
@@ -129,6 +132,34 @@ public class FakeCreeper extends CreeperEntity {
             wz = dz / dist;
         }
         boolean wantMove = wx != 0.0 || wz != 0.0;
+
+        // Если упёрся в стену (и не перепрыгнуть), на время обходит её сбоку.
+        if (wantMove && this.horizontalCollision) {
+            if (++stuckTicks > 8) {
+                stuckTicks = 0;
+                strafeTicks = 20;
+                strafeSign = Math.random() < 0.5 ? 1.0 : -1.0;
+            }
+        } else if (stuckTicks > 0) {
+            stuckTicks--;
+        }
+        if (strafeTicks > 0) {
+            strafeTicks--;
+            double sx = -wz * strafeSign;
+            double sz = wx * strafeSign;
+            wx = sx;
+            wz = sz;
+        }
+
+        // Если оказался внутри блоков, выталкиваем вверх.
+        if (!world.isSpaceEmpty(this)) {
+            for (double up = 0.1; up <= 1.5; up += 0.1) {
+                if (world.isSpaceEmpty(this.getBoundingBox().offset(0.0, up, 0.0))) {
+                    this.setPosition(this.getX(), this.getY() + up, this.getZ());
+                    break;
+                }
+            }
+        }
         if (t != null && dist > 0.01) {
             float yaw = (float) (MathHelper.atan2(dz, dx) * 180.0 / Math.PI) - 90.0f;
             this.setYaw(yaw);
@@ -237,7 +268,7 @@ public class FakeCreeper extends CreeperEntity {
             return;
         }
         lastHit = this.age;
-        applyHit(player.getX(), player.getZ(), 0.2 + cooldown * cooldown * 0.8);
+        applyHit(player.getX(), player.getZ(), 0.2 + cooldown * cooldown * 0.8, 1.0);
     }
 
     /** Удар дамагера: как игрок с мечом, полный удар не чаще раза в 13 тиков (перезарядка меча). */
@@ -247,10 +278,10 @@ public class FakeCreeper extends CreeperEntity {
         }
         lastDamagerHit = this.age;
         lastHit = this.age;
-        applyHit(fromX, fromZ, 1.0);
+        applyHit(fromX, fromZ, 1.0, 0.5); // отдача дамагера в 2 раза меньше
     }
 
-    private void applyHit(double fromX, double fromZ, double strength) {
+    private void applyHit(double fromX, double fromZ, double strength, double knockback) {
         hits += strength;
         if (hits >= HITS_TO_KILL - 1.0e-6) {
             this.setHealth(0.0f);
@@ -258,7 +289,7 @@ public class FakeCreeper extends CreeperEntity {
         double dx = this.getX() - fromX;
         double dz = this.getZ() - fromZ;
         double d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
-        this.setVelocity(dx / d * 0.4, 0.3, dz / d * 0.4);
+        this.setVelocity(dx / d * 0.4 * knockback, 0.3 * knockback, dz / d * 0.4 * knockback);
         this.handleStatus(this.isDead() ? (byte) 3 : (byte) 2);
         Sfx.play(this.isDead() ? SoundEvents.ENTITY_CREEPER_DEATH : SoundEvents.ENTITY_CREEPER_HURT,
                 this.getX(), this.getY(), this.getZ(), 1.0f, 1.0f);

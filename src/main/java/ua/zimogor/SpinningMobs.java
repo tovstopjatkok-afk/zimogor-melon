@@ -136,6 +136,9 @@ public final class SpinningMobs {
                     FakeCreeper creeper = new FakeCreeper(world, true);
                     creeper.setId(nextId++);
                     creeper.setPosition(x, by, z);
+                    if (!world.isSpaceEmpty(creeper)) {
+                        continue; // тесно: как у настоящего спавнера, в блоках не появляемся
+                    }
                     world.addEntity(creeper);
                     creeper.handleStatus((byte) 20); // облачко появления, как у спавнера
                     PHANTOMS.add(creeper);
