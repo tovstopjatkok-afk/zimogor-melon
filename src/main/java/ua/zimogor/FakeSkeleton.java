@@ -1,6 +1,7 @@
 package ua.zimogor;
 
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.EntityType;
@@ -13,8 +14,10 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.registry.Registries;
 import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
@@ -28,7 +31,7 @@ import net.minecraft.world.World;
  * держит дистанцию, кружит и стреляет стрелами (стрелы только визуальные),
  * подчиняется физике (вода, лёд, лава, падение).
  */
-public class FakeSkeleton extends SkeletonEntity {
+public class FakeSkeleton extends SkeletonEntity implements FakeMob {
     private static final int HITS_TO_KILL = 2; // умирает с двух ударов
 
     private final boolean phantom;
@@ -48,6 +51,10 @@ public class FakeSkeleton extends SkeletonEntity {
     private int lastHit = -100;
     private int lastDamagerHit = -100;
     private double peakY = Double.NaN;
+    private int freezeTicks;
+    private int snowTicks;
+    private static final int CONVERT_TICKS = 160; // 8 сек
+    private static final int FREEZE_TICKS = 120; // в ванили 140 тиков (7 сек), у нас на секунду быстрее
 
     public FakeSkeleton(World world, boolean phantom) {
         super(EntityType.SKELETON, world);
@@ -57,6 +64,7 @@ public class FakeSkeleton extends SkeletonEntity {
         this.setSilent(!phantom);
         if (phantom) {
             this.equipStack(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+            equipRandomArmor();
         } else {
             this.setInvulnerable(true);
             EntityAttributeInstance scale = this.getAttributeInstance(EntityAttributes.SCALE);
@@ -66,6 +74,58 @@ public class FakeSkeleton extends SkeletonEntity {
         }
     }
 
+    private static final String[] ARMOR_MATERIALS = {"leather", "golden", "iron", "copper"};
+    private static final String[] ARMOR_PARTS = {"helmet", "chestplate", "leggings", "boots"};
+    private static final EquipmentSlot[] ARMOR_SLOTS = {
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
+    private static final double ARMOR_CHANCE = 0.3; // шанс на каждую часть брони
+
+    /** С шансом надевает на каждую часть тела случайную броню (кожа, золото, железо, медь). */
+    private void equipRandomArmor() {
+        for (int i = 0; i < ARMOR_SLOTS.length; i++) {
+            if (this.random.nextDouble() >= ARMOR_CHANCE) {
+                continue;
+            }
+            // Медная броня есть не во всех версиях игры: если предмета нет, берём другой материал.
+            for (int attempt = 0; attempt < 8; attempt++) {
+                String material = ARMOR_MATERIALS[this.random.nextInt(ARMOR_MATERIALS.length)];
+                Identifier id = Identifier.of("minecraft", material + "_" + ARMOR_PARTS[i]);
+                if (Registries.ITEM.containsId(id)) {
+                    this.equipStack(ARMOR_SLOTS[i], new ItemStack(Registries.ITEM.get(id)));
+                    break;
+                }
+            }
+        }
+    }
+
+    /** Полностью замёрзшим считается через 120 тиков (6 сек) вместо 140. */
+    @Override
+    public int getMinFreezeDamageTicks() {
+        return FREEZE_TICKS;
+    }
+
+    /** Превращает скелета в странника (зимогора), сохраняя положение, скорость, экипировку и полученные удары. */
+    private void convertToStray(ClientWorld world) {
+        FakeStray stray = new FakeStray(world);
+        stray.setId(SpinningMobs.nextEntityId());
+        stray.setPosition(this.getX(), this.getY(), this.getZ());
+        stray.setVelocity(this.getVelocity());
+        stray.setYaw(this.getYaw());
+        stray.setBodyYaw(this.getBodyYaw());
+        stray.setHeadYaw(this.getHeadYaw());
+        stray.hits = this.hits;
+        stray.peakY = this.peakY;
+        for (EquipmentSlot slot : new EquipmentSlot[] {EquipmentSlot.MAINHAND, EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+            stray.equipStack(slot, this.getEquippedStack(slot).copy());
+        }
+        world.addEntity(stray);
+        stray.handleStatus((byte) 20);
+        SpinningMobs.replacePhantom(this, stray);
+        this.discard();
+    }
+
+    @Override
     public boolean isPhantom() {
         return phantom;
     }
@@ -201,6 +261,26 @@ public class FakeSkeleton extends SkeletonEntity {
             }
         }
 
+        // Рыхлый снег: проваливается (как у ванильных мобов без кожаных ботинок) и постепенно замерзает.
+        BlockPos feet = BlockPos.ofFloored(this.getX(), this.getY(), this.getZ());
+        boolean inSnow = world.getBlockState(feet).isOf(Blocks.POWDER_SNOW)
+                || world.getBlockState(BlockPos.ofFloored(this.getX(), this.getEyeY(), this.getZ()))
+                        .isOf(Blocks.POWDER_SNOW);
+        {
+            if (inSnow) {
+                freezeTicks = Math.min(FREEZE_TICKS, freezeTicks + 1);
+                // В ванили скелет превращается в странника за 15 сек (300 тиков), у нас 8 сек (160 тиков).
+                if (++snowTicks >= CONVERT_TICKS) {
+                    convertToStray(world);
+                    return;
+                }
+            } else {
+                freezeTicks = Math.max(0, freezeTicks - 2);
+                snowTicks = 0;
+            }
+            this.setFrozenTicks(freezeTicks);
+        }
+
         // Падение: смертельно с высоты больше 23 блоков.
         boolean water = this.isTouchingWater();
         boolean ground = this.isOnGround();
@@ -243,8 +323,35 @@ public class FakeSkeleton extends SkeletonEntity {
             vz += wz * 0.02;
         }
 
+        // Замедление в паутине и рыхлом снегу (как у настоящих мобов: движение умножается, скорость гасится).
+        double mx = 1.0;
+        double my = 1.0;
+        double mz = 1.0;
+        boolean slowed = false;
+        if (touchesBlock(world, Blocks.COBWEB)) {
+            mx = 0.25;
+            my = 0.0125; // падение в паутине в 4 раза медленнее (было 0.05)
+            mz = 0.25;
+            slowed = true;
+        } else if (inSnow) {
+            mx = 0.9;
+            my = 1.5;
+            mz = 0.9;
+            slowed = true;
+        }
+
+        double beforeX = this.getX();
+        double beforeZ = this.getZ();
         this.setVelocity(vx, vy, vz);
-        this.move(MovementType.SELF, new Vec3d(vx, vy, vz));
+        this.move(MovementType.SELF, new Vec3d(vx * mx, vy * my, vz * mz));
+        if (slowed) {
+            this.setVelocity(0.0, 0.0, 0.0);
+        }
+
+        // Анимация ходьбы (ноги и руки), как у настоящих мобов.
+        double moved = Math.sqrt((this.getX() - beforeX) * (this.getX() - beforeX)
+                + (this.getZ() - beforeZ) * (this.getZ() - beforeZ));
+        animateLimbs((float) Math.min(moved * 4.0, 1.0));
 
         Vec3d after = this.getVelocity();
         vx = after.x;
@@ -265,6 +372,54 @@ public class FakeSkeleton extends SkeletonEntity {
         if (this.isOnGround() && !water && wantMove && ++stepTicks >= 8) {
             stepTicks = 0;
             Sfx.play(SoundEvents.ENTITY_SKELETON_STEP, this.getX(), this.getY(), this.getZ(), 0.15f, 1.0f);
+        }
+    }
+
+    /** Касается ли скелет блока данного типа (паутина и т.п.). */
+    private boolean touchesBlock(ClientWorld world, net.minecraft.block.Block block) {
+        net.minecraft.util.math.Box box = this.getBoundingBox().contract(1.0e-7);
+        for (BlockPos p : BlockPos.iterate(BlockPos.ofFloored(box.minX, box.minY, box.minZ),
+                BlockPos.ofFloored(box.maxX, box.maxY, box.maxZ))) {
+            if (world.getBlockState(p).isOf(block)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static java.lang.reflect.Method limbUpdate;
+    private static boolean limbInit;
+
+    /** Двигает ноги и руки. Метод аниматора ищем по сигнатуре (void, только float-параметры), чтобы не зависеть от версии. */
+    private void animateLimbs(float speed) {
+        try {
+            if (!limbInit) {
+                limbInit = true;
+                for (java.lang.reflect.Method m : this.limbAnimator.getClass().getDeclaredMethods()) {
+                    if (m.getReturnType() != void.class || java.lang.reflect.Modifier.isStatic(m.getModifiers())
+                            || m.getParameterCount() < 2) {
+                        continue;
+                    }
+                    boolean allFloat = true;
+                    for (Class<?> c : m.getParameterTypes()) {
+                        allFloat &= c == float.class;
+                    }
+                    if (allFloat) {
+                        m.setAccessible(true);
+                        limbUpdate = m;
+                        break;
+                    }
+                }
+            }
+            if (limbUpdate == null) {
+                return;
+            }
+            Object[] args = limbUpdate.getParameterCount() == 2
+                    ? new Object[] {speed, 0.4f}
+                    : new Object[] {speed, 0.4f, 1.0f};
+            limbUpdate.invoke(this.limbAnimator, args);
+        } catch (Exception e) {
+            limbUpdate = null;
         }
     }
 
@@ -305,6 +460,7 @@ public class FakeSkeleton extends SkeletonEntity {
      * Удар игрока, как у настоящего: сила зависит от перезарядки (быстрые клики по 20-100% удара),
      * после удара 10 тиков неуязвимость. Полный удар считается за 1, два полных убивают.
      */
+    @Override
     public void clientHit(PlayerEntity player) {
         if (this.isDead()) {
             return;
@@ -319,6 +475,7 @@ public class FakeSkeleton extends SkeletonEntity {
     }
 
     /** Удар дамагера: как игрок с мечом, полный удар не чаще раза в 13 тиков (перезарядка меча). */
+    @Override
     public void damagerHit(double fromX, double fromZ) {
         if (this.isDead() || this.age - lastDamagerHit < 13 || this.age - lastHit < 10) {
             return;
@@ -343,6 +500,7 @@ public class FakeSkeleton extends SkeletonEntity {
     }
 
     /** Убить мгновенно (лава, падение): только у нас на клиенте. */
+    @Override
     public void clientKill() {
         if (this.isDead()) {
             return;

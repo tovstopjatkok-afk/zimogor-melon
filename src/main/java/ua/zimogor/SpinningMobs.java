@@ -31,7 +31,7 @@ public final class SpinningMobs {
     private static final int MAX_NEARBY = 6;
 
     private static final Map<BlockPos, List<Entity>> MOBS = new HashMap<>();
-    private static final List<FakeSkeleton> PHANTOMS = new ArrayList<>();
+    private static final List<FakeMob> PHANTOMS = new ArrayList<>();
     private static final Map<BlockPos, Integer> SPAWN_DELAY = new HashMap<>();
     private static final Set<BlockPos> DAMAGERS = new HashSet<>();
     private static final Map<ArrowEntity, Integer> ARROWS = new HashMap<>();
@@ -40,6 +40,20 @@ public final class SpinningMobs {
     private static int timer;
 
     private SpinningMobs() {
+    }
+
+    public static int nextEntityId() {
+        return nextId++;
+    }
+
+    /** Заменяет скелета на странника в списке блуждающих. */
+    public static void replacePhantom(FakeMob old, FakeMob replacement) {
+        int i = PHANTOMS.indexOf(old);
+        if (i >= 0) {
+            PHANTOMS.set(i, replacement);
+        } else {
+            PHANTOMS.add(replacement);
+        }
     }
 
     public static void tick(MinecraftClient client) {
@@ -104,9 +118,9 @@ public final class SpinningMobs {
         ThreadLocalRandom r = ThreadLocalRandom.current();
 
         PHANTOMS.removeIf(c -> {
-            boolean drop = c.isRemoved() || c.squaredDistanceTo(client.player) > 48.0 * 48.0;
+            boolean drop = c.self().isRemoved() || c.self().squaredDistanceTo(client.player) > 48.0 * 48.0;
             if (drop) {
-                c.discard();
+                c.self().discard();
             }
             return drop;
         });
@@ -116,15 +130,16 @@ public final class SpinningMobs {
             if (pos.getSquaredDistance(center) > 256) {
                 continue;
             }
-            int delay = SPAWN_DELAY.getOrDefault(pos, 20) - SCAN_EVERY_TICKS;
+            // Первый спавн у каждого спавнера в своё случайное время (1-30 сек), а не у всех сразу.
+            int delay = SPAWN_DELAY.computeIfAbsent(pos, k -> 20 + r.nextInt(600)) - SCAN_EVERY_TICKS;
             if (delay > 0) {
                 SPAWN_DELAY.put(pos, delay);
                 continue;
             }
-            SPAWN_DELAY.put(pos, 200 + r.nextInt(600));
+            SPAWN_DELAY.put(pos, 100 + r.nextInt(700)); // у каждого спавнера свой случайный интервал
 
             Box area = new Box(pos).expand(4.0);
-            long nearby = PHANTOMS.stream().filter(c -> c.getBoundingBox().intersects(area)).count();
+            long nearby = PHANTOMS.stream().filter(c -> c.self().getBoundingBox().intersects(area)).count();
             if (nearby >= MAX_NEARBY) {
                 continue;
             }
@@ -197,8 +212,8 @@ public final class SpinningMobs {
             double cx = pos.getX() + 0.5;
             double cy = pos.getY() + 0.5;
             double cz = pos.getZ() + 0.5;
-            for (FakeSkeleton c : PHANTOMS) {
-                if (!c.isDead() && c.squaredDistanceTo(cx, cy, cz) <= 4.0) {
+            for (FakeMob c : PHANTOMS) {
+                if (!c.self().isDead() && c.self().squaredDistanceTo(cx, cy, cz) <= 4.0) {
                     c.damagerHit(cx, cz);
                 }
             }
@@ -233,7 +248,7 @@ public final class SpinningMobs {
             list.forEach(Entity::discard);
         }
         MOBS.clear();
-        PHANTOMS.forEach(Entity::discard);
+        PHANTOMS.forEach(c -> c.self().discard());
         PHANTOMS.clear();
         SPAWN_DELAY.clear();
         DAMAGERS.clear();
