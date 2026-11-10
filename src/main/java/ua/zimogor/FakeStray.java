@@ -47,10 +47,10 @@ public class FakeStray extends StrayEntity implements FakeMob {
     private int unstuckTicks;
     private double unstuckSign = 1.0;
     private int deadTicks;
-    private double hits;
+    double hits;
     private int lastHit = -100;
     private int lastDamagerHit = -100;
-    private double peakY = Double.NaN;
+    double peakY = Double.NaN;
 
     public FakeStray(World world) {
         this(world, true);
