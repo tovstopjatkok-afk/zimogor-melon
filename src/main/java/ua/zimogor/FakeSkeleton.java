@@ -291,8 +291,35 @@ public class FakeSkeleton extends SkeletonEntity {
             vz += wz * 0.02;
         }
 
+        // Замедление в паутине и рыхлом снегу (как у настоящих мобов: движение умножается, скорость гасится).
+        double mx = 1.0;
+        double my = 1.0;
+        double mz = 1.0;
+        boolean slowed = false;
+        if (touchesBlock(world, Blocks.COBWEB)) {
+            mx = 0.25;
+            my = 0.05;
+            mz = 0.25;
+            slowed = true;
+        } else if (inSnow) {
+            mx = 0.9;
+            my = 1.5;
+            mz = 0.9;
+            slowed = true;
+        }
+
+        double beforeX = this.getX();
+        double beforeZ = this.getZ();
         this.setVelocity(vx, vy, vz);
-        this.move(MovementType.SELF, new Vec3d(vx, vy, vz));
+        this.move(MovementType.SELF, new Vec3d(vx * mx, vy * my, vz * mz));
+        if (slowed) {
+            this.setVelocity(0.0, 0.0, 0.0);
+        }
+
+        // Анимация ходьбы (ноги и руки), как у настоящих мобов.
+        double moved = Math.sqrt((this.getX() - beforeX) * (this.getX() - beforeX)
+                + (this.getZ() - beforeZ) * (this.getZ() - beforeZ));
+        animateLimbs((float) Math.min(moved * 4.0, 1.0));
 
         Vec3d after = this.getVelocity();
         vx = after.x;
@@ -313,6 +340,54 @@ public class FakeSkeleton extends SkeletonEntity {
         if (this.isOnGround() && !water && wantMove && ++stepTicks >= 8) {
             stepTicks = 0;
             Sfx.play(SoundEvents.ENTITY_SKELETON_STEP, this.getX(), this.getY(), this.getZ(), 0.15f, 1.0f);
+        }
+    }
+
+    /** Касается ли скелет блока данного типа (паутина и т.п.). */
+    private boolean touchesBlock(ClientWorld world, net.minecraft.block.Block block) {
+        net.minecraft.util.math.Box box = this.getBoundingBox().contract(1.0e-7);
+        for (BlockPos p : BlockPos.iterate(BlockPos.ofFloored(box.minX, box.minY, box.minZ),
+                BlockPos.ofFloored(box.maxX, box.maxY, box.maxZ))) {
+            if (world.getBlockState(p).isOf(block)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static java.lang.reflect.Method limbUpdate;
+    private static boolean limbInit;
+
+    /** Двигает ноги и руки. Метод аниматора ищем по сигнатуре (void, только float-параметры), чтобы не зависеть от версии. */
+    private void animateLimbs(float speed) {
+        try {
+            if (!limbInit) {
+                limbInit = true;
+                for (java.lang.reflect.Method m : this.limbAnimator.getClass().getDeclaredMethods()) {
+                    if (m.getReturnType() != void.class || java.lang.reflect.Modifier.isStatic(m.getModifiers())
+                            || m.getParameterCount() < 2) {
+                        continue;
+                    }
+                    boolean allFloat = true;
+                    for (Class<?> c : m.getParameterTypes()) {
+                        allFloat &= c == float.class;
+                    }
+                    if (allFloat) {
+                        m.setAccessible(true);
+                        limbUpdate = m;
+                        break;
+                    }
+                }
+            }
+            if (limbUpdate == null) {
+                return;
+            }
+            Object[] args = limbUpdate.getParameterCount() == 2
+                    ? new Object[] {speed, 0.4f}
+                    : new Object[] {speed, 0.4f, 1.0f};
+            limbUpdate.invoke(this.limbAnimator, args);
+        } catch (Exception e) {
+            limbUpdate = null;
         }
     }
 
