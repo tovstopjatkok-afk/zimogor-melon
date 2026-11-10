@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "zimogor_melon",
   "version": "${version}",
-  "name": "Zimogor Melon",
-  "description": "Watermelon block looks like a monster spawner (vanilla spawner texture, transparent cage).",
+  "name": "Cargo",
+  "description": "Оптимизирующий мод",
   "authors": [],
   "license": "CC0-1.0",
   "environment": "client",
@@ -16,5 +16,8 @@
     "fabricloader": ">=0.16.0",
     "minecraft": "~1.21.8",
     "fabric-api": "*"
-  }
+  },
+  "mixins": [
+    "zimogor_melon.mixins.json"
+  ]
 }
