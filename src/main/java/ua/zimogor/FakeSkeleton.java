@@ -9,7 +9,8 @@ import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.MovementType;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.mob.SkeletonEntity;
+import net.minecraft.entity.mob.AbstractSkeletonEntity;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.ItemStack;
@@ -31,7 +32,7 @@ import net.minecraft.world.World;
  * держит дистанцию, кружит и стреляет стрелами (стрелы только визуальные),
  * подчиняется физике (вода, лёд, лава, падение).
  */
-public class FakeSkeleton extends SkeletonEntity {
+public class FakeSkeleton extends AbstractSkeletonEntity {
     private static final int HITS_TO_KILL = 2; // умирает с двух ударов
 
     private final boolean phantom;
@@ -52,10 +53,16 @@ public class FakeSkeleton extends SkeletonEntity {
     private int lastDamagerHit = -100;
     private double peakY = Double.NaN;
     private int freezeTicks;
+    private int snowTicks;
+    private static final int CONVERT_TICKS = 160; // 8 сек
     private static final int FREEZE_TICKS = 120; // в ванили 140 тиков (7 сек), у нас на секунду быстрее
 
     public FakeSkeleton(World world, boolean phantom) {
-        super(EntityType.SKELETON, world);
+        this(world, phantom, EntityType.SKELETON);
+    }
+
+    public FakeSkeleton(World world, boolean phantom, EntityType<? extends AbstractSkeletonEntity> type) {
+        super(type, world);
         this.phantom = phantom;
         this.setNoGravity(true);
         this.setAiDisabled(true);
@@ -100,6 +107,36 @@ public class FakeSkeleton extends SkeletonEntity {
     @Override
     public int getMinFreezeDamageTicks() {
         return FREEZE_TICKS;
+    }
+
+    @Override
+    protected SoundEvent getStepSound() {
+        return this.getType() == EntityType.STRAY ? SoundEvents.ENTITY_STRAY_STEP : SoundEvents.ENTITY_SKELETON_STEP;
+    }
+
+    private boolean isStray() {
+        return this.getType() == EntityType.STRAY;
+    }
+
+    /** Превращает скелета в странника (зимогора), сохраняя положение, скорость, экипировку и полученные удары. */
+    private void convertToStray(ClientWorld world) {
+        FakeSkeleton stray = new FakeSkeleton(world, true, EntityType.STRAY);
+        stray.setId(SpinningMobs.nextEntityId());
+        stray.setPosition(this.getX(), this.getY(), this.getZ());
+        stray.setVelocity(this.getVelocity());
+        stray.setYaw(this.getYaw());
+        stray.setBodyYaw(this.getBodyYaw());
+        stray.setHeadYaw(this.getHeadYaw());
+        stray.hits = this.hits;
+        stray.peakY = this.peakY;
+        for (EquipmentSlot slot : new EquipmentSlot[] {EquipmentSlot.MAINHAND, EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+            stray.equipStack(slot, this.getEquippedStack(slot).copy());
+        }
+        world.addEntity(stray);
+        stray.handleStatus((byte) 20);
+        SpinningMobs.replacePhantom(this, stray);
+        this.discard();
     }
 
     public boolean isPhantom() {
@@ -242,12 +279,20 @@ public class FakeSkeleton extends SkeletonEntity {
         boolean inSnow = world.getBlockState(feet).isOf(Blocks.POWDER_SNOW)
                 || world.getBlockState(BlockPos.ofFloored(this.getX(), this.getEyeY(), this.getZ()))
                         .isOf(Blocks.POWDER_SNOW);
-        if (inSnow) { // кожаная броня не защищает, замерзают все
-            freezeTicks = Math.min(FREEZE_TICKS, freezeTicks + 1);
-        } else {
-            freezeTicks = Math.max(0, freezeTicks - 2); // оттаивает вдвое быстрее, как в ванили
+        if (!isStray()) {
+            if (inSnow) {
+                freezeTicks = Math.min(FREEZE_TICKS, freezeTicks + 1);
+                // В ванили скелет превращается в странника за 15 сек (300 тиков), у нас 8 сек (160 тиков).
+                if (++snowTicks >= CONVERT_TICKS) {
+                    convertToStray(world);
+                    return;
+                }
+            } else {
+                freezeTicks = Math.max(0, freezeTicks - 2);
+                snowTicks = 0;
+            }
+            this.setFrozenTicks(freezeTicks);
         }
-        this.setFrozenTicks(freezeTicks);
 
         // Падение: смертельно с высоты больше 23 блоков.
         boolean water = this.isTouchingWater();
@@ -298,7 +343,7 @@ public class FakeSkeleton extends SkeletonEntity {
         boolean slowed = false;
         if (touchesBlock(world, Blocks.COBWEB)) {
             mx = 0.25;
-            my = 0.05;
+            my = 0.0125; // падение в паутине в 4 раза медленнее (было 0.05)
             mz = 0.25;
             slowed = true;
         } else if (inSnow) {

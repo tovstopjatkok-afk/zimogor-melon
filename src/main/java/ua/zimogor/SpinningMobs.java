@@ -42,6 +42,20 @@ public final class SpinningMobs {
     private SpinningMobs() {
     }
 
+    public static int nextEntityId() {
+        return nextId++;
+    }
+
+    /** Заменяет скелета на странника в списке блуждающих. */
+    public static void replacePhantom(FakeSkeleton old, FakeSkeleton replacement) {
+        int i = PHANTOMS.indexOf(old);
+        if (i >= 0) {
+            PHANTOMS.set(i, replacement);
+        } else {
+            PHANTOMS.add(replacement);
+        }
+    }
+
     public static void tick(MinecraftClient client) {
         ClientWorld world = client.world;
         if (world != lastWorld) {
