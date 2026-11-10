@@ -21,7 +21,7 @@ import org.lwjgl.glfw.GLFW;
  * Поршни используют текстуру спавнера (см. blockstates/piston.json).
  * У текстуры спавнера прозрачные дырки в клетке, поэтому блок нужно
  * рисовать в слое CUTOUT, иначе вместо прозрачности будет чёрный фон.
- * Внутри каждого поршня крутится скелет (см. SpinningMobs).
+ * Внутри каждого поршня крутится крипер (см. SpinningMobs).
  */
 public class ZimogorMelonClient implements ClientModInitializer {
     @Override

@@ -42,20 +42,6 @@ public final class SpinningMobs {
     private SpinningMobs() {
     }
 
-    public static int nextEntityId() {
-        return nextId++;
-    }
-
-    /** Заменяет скелета на странника в списке блуждающих. */
-    public static void replacePhantom(FakeSkeleton old, FakeSkeleton replacement) {
-        int i = PHANTOMS.indexOf(old);
-        if (i >= 0) {
-            PHANTOMS.set(i, replacement);
-        } else {
-            PHANTOMS.add(replacement);
-        }
-    }
-
     public static void tick(MinecraftClient client) {
         ClientWorld world = client.world;
         if (world != lastWorld) {
@@ -130,13 +116,12 @@ public final class SpinningMobs {
             if (pos.getSquaredDistance(center) > 256) {
                 continue;
             }
-            // Первый спавн у каждого спавнера в своё случайное время (1-30 сек), а не у всех сразу.
-            int delay = SPAWN_DELAY.computeIfAbsent(pos, k -> 20 + r.nextInt(600)) - SCAN_EVERY_TICKS;
+            int delay = SPAWN_DELAY.getOrDefault(pos, 20) - SCAN_EVERY_TICKS;
             if (delay > 0) {
                 SPAWN_DELAY.put(pos, delay);
                 continue;
             }
-            SPAWN_DELAY.put(pos, 100 + r.nextInt(700)); // у каждого спавнера свой случайный интервал
+            SPAWN_DELAY.put(pos, 200 + r.nextInt(600));
 
             Box area = new Box(pos).expand(4.0);
             long nearby = PHANTOMS.stream().filter(c -> c.getBoundingBox().intersects(area)).count();
